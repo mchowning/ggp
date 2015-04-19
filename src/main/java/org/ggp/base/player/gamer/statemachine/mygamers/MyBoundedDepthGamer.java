@@ -13,7 +13,7 @@ import java.util.Random;
 
 public class MyBoundedDepthGamer extends SampleGamer {
 
-    private static final int DEPTH_LIMIT = 6;
+    private static final int DEPTH_LIMIT = 3;
 
     @Override
     public Move stateMachineSelectMove(long timeout) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
@@ -77,7 +77,7 @@ public class MyBoundedDepthGamer extends SampleGamer {
         if (getStateMachine().isTerminal(state)) {
             return getGoalScore(state);
         } else if (levelHitLimt(level)) {
-            return 0;
+            return getGoalScore(state);
         } else {
             int maxScore = Integer.MIN_VALUE;
             for (Move move : getStateMachine().getLegalMoves(state, getRole())) {
