@@ -11,6 +11,9 @@ import org.ggp.base.util.statemachine.exceptions.TransitionDefinitionException;
 import java.util.List;
 import java.util.Random;
 
+// FIXME This is buggy.  It does not treat a single state transition as requiring a move from both players.
+// Look at MyFixedDepthHeuristicGamer
+
 public class MyBoundedDepthGamer extends SampleGamer {
 
     private static final int DEPTH_LIMIT = 3;

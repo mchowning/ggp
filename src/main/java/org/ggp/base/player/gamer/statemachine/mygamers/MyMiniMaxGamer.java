@@ -10,6 +10,9 @@ import org.ggp.base.util.statemachine.exceptions.TransitionDefinitionException;
 
 import java.util.List;
 
+// FIXME This is buggy.  It does not treat a single state transition as requiring a move from both players.
+// Look at MyFixedDepthHeuristicGamer
+
 public class MyMiniMaxGamer extends SampleGamer {
 
     @Override
