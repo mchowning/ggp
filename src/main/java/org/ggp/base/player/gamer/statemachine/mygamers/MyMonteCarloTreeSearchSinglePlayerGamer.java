@@ -11,13 +11,10 @@ import org.ggp.base.util.statemachine.exceptions.TransitionDefinitionException;
 
 import java.util.*;
 
-public class MyMonteCarloTreeSearchGamer extends SampleGamer {
-
-    private enum NodeType { MAX, MIN }
+public class MyMonteCarloTreeSearchSinglePlayerGamer extends SampleGamer {
 
     private class Node {
 
-        private NodeType nodeType;
         private MachineState state;
         private Node parent;
         private Move moveFromParent;
@@ -25,9 +22,7 @@ public class MyMonteCarloTreeSearchGamer extends SampleGamer {
         private int numVisits = 0;
         private int utility = 0;
 
-//        public Node(NodeType nodeType, MachineState state, Node parent, Move moveFromParent) {
         public Node(MachineState state, Node parent, Move moveFromParent) {
-            this.nodeType = nodeType;
             this.state = state;
             this.parent = parent;
             this.moveFromParent = moveFromParent;
@@ -41,13 +36,7 @@ public class MyMonteCarloTreeSearchGamer extends SampleGamer {
             return parent;
         }
 
-        public void addChildNode(Node childNode) {
-            children.add(childNode);
-        }
-
         public Node createChildNode(MachineState state, Move move) {
-//        public Node createChildNode(NodeType nodeType, MachineState state, Move move) {
-//            Node childNode = new Node(nodeType, state, this, move);
             Node childNode = new Node(state, this, move);
             children.add(childNode);
             return childNode;
@@ -87,7 +76,6 @@ public class MyMonteCarloTreeSearchGamer extends SampleGamer {
         }
     }
 
-//    private static final int DEPTH_LIMIT = 3;
     private static final int NUM_PROBES = 50;
     private Random random = new Random();
 
@@ -119,7 +107,6 @@ public class MyMonteCarloTreeSearchGamer extends SampleGamer {
         if (nodeMap.containsKey(getCurrentState())) {
             startNode = nodeMap.get(getCurrentState());
         } else {
-//            startNode = new Node(NodeType.MAX, getCurrentState(), null, null);
             startNode = new Node(getCurrentState(), null, null);
         }
 
@@ -140,33 +127,8 @@ public class MyMonteCarloTreeSearchGamer extends SampleGamer {
         System.out.println(bestChildNode.getEffectiveUtility());
         return bestChildNode.getMoveFromParent();
 
-//
-//        Move bestMove = null;
-//        int bestScore = Integer.MIN_VALUE;
-//        int worstScore = Integer.MAX_VALUE;
-//        for (Move move : moves) {
-//            int moveScore = getMinScore(getCurrentState(), move, 0);
-//            if (moveScore == 100) {
-//                System.out.println("Winning move found");
-//                return move;
-//            } else if (moveScore >= bestScore) {
-//                bestScore = moveScore;
-//                bestMove = move;
-//            }
-//            if (moveScore <= worstScore) {
-//                worstScore = moveScore;
-//            }
-//        }
-//        if (worstScore == bestScore) {
-//            System.out.println("worstScore == bestScore, with score of: " + bestScore);
-//            return getRandomMove(moves);
-//        } else {
-//            System.out.println("bestScore of: " + bestScore);
-//            return bestMove;
-//        }
     }
 
-    // FIXME only works for 1-player game
     private Node selectNode(Node startNode) throws MoveDefinitionException, TransitionDefinitionException {
         if (startNode.getNumVisits() == 0 || startNode.getChildren().isEmpty()) {
             return startNode;
@@ -178,7 +140,6 @@ public class MyMonteCarloTreeSearchGamer extends SampleGamer {
                 }
             }
 
-            // FIXME this needs to alternate based on whether it is a min or max node??
             int bestSelectValue = Integer.MIN_VALUE;
             Node resultingNode = null;
             for (Node childNode : children) {
@@ -200,7 +161,6 @@ public class MyMonteCarloTreeSearchGamer extends SampleGamer {
         return (int) (nodeTotalUtility + Math.sqrt( 2 * Math.log(parentNodeVisits) / nodeVisits));
     }
 
-    // FIXME only works for 1-player game
     private void expandNode(Node node) throws MoveDefinitionException, TransitionDefinitionException {
         MachineState nodeState = node.getState();
         List<Move> moveList = getStateMachine().getLegalMoves(nodeState, getRole());
@@ -211,7 +171,6 @@ public class MyMonteCarloTreeSearchGamer extends SampleGamer {
         }
     }
 
-    // FIXME only works for 1-player game
     private void backpropogate(Node node, int score) {
         node.addVisit();
         int prevUtility = node.getTotalUtility();
@@ -228,70 +187,6 @@ public class MyMonteCarloTreeSearchGamer extends SampleGamer {
         return depthCharge(startNode);
     }
 
-
-
-
-
-
-    /*
-     * Previous code
-     */
-
-    private Move getRandomMove(List<Move> moves) {
-        return moves.get(random.nextInt(moves.size()));
-    }
-
-//    private int getMaxScore(MachineState state, int level) throws GoalDefinitionException, TransitionDefinitionException, MoveDefinitionException {
-//        if (getStateMachine().isTerminal(state)) {
-//            return getGoalScore(state);
-//        } else if (hasReachedDepthLimit(level)) {
-//            return monteCarloSearch(state);
-//        } else {
-//            int maxScore = Integer.MIN_VALUE;
-//            for (Move move : getStateMachine().getLegalMoves(state, getRole())) {
-//                int score = getMinScore(state, move, level);
-//                if (score >= maxScore) {
-//                    maxScore = score;
-//                }
-//            }
-//            return maxScore;
-//        }
-//    }
-
-//    /*
-//     * NOTE: Only works for 1-player or 2-player games
-//     */
-//    private int getMinScore(MachineState state, Move maximizedMove, int level) throws GoalDefinitionException, TransitionDefinitionException, MoveDefinitionException {
-//
-//        List<Role> roles = getStateMachine().getRoles();
-//        switch (roles.size()) {
-//            case 1:
-//                // single player game
-//                MachineState nextState = getStateMachine().getNextState(state, Collections.singletonList(maximizedMove));
-//                return getMaxScore(nextState, level+1);
-//            case 2:
-//                // two player game
-//                return getMinScoreFor2PlayerOpponent(state, maximizedMove, level, roles);
-////                return getAverageScoreForRandom2PlayerOpponent(state, maximizedMove, level, roles);
-//
-//            default:
-//                throw new RuntimeException("Game must have 1 or 2 roles, but has " + roles.size());
-//        }
-//    }
-
-//    private int monteCarloSearch(MachineState state) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException {
-//        if (NUM_PROBES == 0) {
-//            return 50;
-//        } else {
-//            int total = 0;
-//            for (int i = 0; i < NUM_PROBES; i++) {
-//                total += depthCharge(state);
-//            }
-//            return total / NUM_PROBES;
-//        }
-//    }
-
-    // FIXME only works for 1-player
     private int depthCharge(Node node) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException {
         if (getStateMachine().isTerminal(node.getState())) {
             int score = getGoalScore(node.getState());
@@ -305,18 +200,6 @@ public class MyMonteCarloTreeSearchGamer extends SampleGamer {
 
             Node randomChildNode = getRandomChildNode(node);
             return depthCharge(randomChildNode);
-
-
-            // 2-player implementation of depth charge
-//            List<Move> moveList = new ArrayList<>();
-//            List<Role> roles = getStateMachine().getRoles();
-//            for (Role role : roles) {
-//                List<Move> legalMovesForRole = getStateMachine().getLegalMoves(state, role);
-//                Move randomMove = getRandomMove(legalMovesForRole);
-//                moveList.add(randomMove);
-//            }
-//            MachineState nextState = getStateMachine().getNextState(state, moveList);
-//            return depthCharge(nextState);
         }
     }
 
@@ -325,57 +208,7 @@ public class MyMonteCarloTreeSearchGamer extends SampleGamer {
         return childNodes.get(random.nextInt(childNodes.size()));
     }
 
-//    private int getAverageScoreForRandom2PlayerOpponent(MachineState state, Move maximizedMove, int level, List<Role> roles) throws MoveDefinitionException, TransitionDefinitionException, GoalDefinitionException {
-//        MachineState nextState;
-//        Role opponent = getOpponentIn2PlayerGame(roles);
-//
-//        int sumOfScores = 0;
-//        List<Move> opponentLegalMoves = getStateMachine().getLegalMoves(state, opponent);
-//        for (Move opponentMove : opponentLegalMoves) {
-//            List<Move> moveList = generateMoveListFor2Players(roles, maximizedMove, opponentMove);
-//            nextState = getStateMachine().getNextState(state, moveList);
-//            int score = getMaxScore(nextState, level + 1);
-//            sumOfScores += score;
-//        }
-//        return sumOfScores / opponentLegalMoves.size();
-//    }
-//
-//    private int getMinScoreFor2PlayerOpponent(MachineState state, Move maximizedMove, int level, List<Role> roles) throws MoveDefinitionException, TransitionDefinitionException, GoalDefinitionException {
-//        MachineState nextState;
-//        Role opponent = getOpponentIn2PlayerGame(roles);
-//
-//        int minScore = Integer.MAX_VALUE;
-//        for (Move opponentMove : getStateMachine().getLegalMoves(state, opponent)) {
-//            List<Move> moveList = generateMoveListFor2Players(roles, maximizedMove, opponentMove);
-//            nextState = getStateMachine().getNextState(state, moveList);
-//            int score = getMaxScore(nextState, level + 1);
-//            if (score < minScore) {
-//                minScore = score;
-//            }
-//        }
-//        return minScore;
-//    }
-//
-//    private List<Move> generateMoveListFor2Players(List<Role> roles, Move gamerMove, Move opponentMove) {
-//        Role gamerRole = getRole();
-//        if (roles.get(0).equals(gamerRole)) {
-//            return Arrays.asList(gamerMove, opponentMove);
-//        } else {
-//            return Arrays.asList(opponentMove, gamerMove);
-//        }
-//    }
-//
-//    private Role getOpponentIn2PlayerGame(List<Role> roles) {
-//        assert(roles.size() == 2);
-//        Role gamerRole = getRole();
-//        return roles.get(0).equals(gamerRole) ? roles.get(1) : roles.get(0);
-//    }
-
     private int getGoalScore(MachineState currentState) throws GoalDefinitionException {
         return getStateMachine().getGoal(currentState, getRole());
     }
-
-//    private boolean hasReachedDepthLimit(int level) {
-//        return level >= DEPTH_LIMIT;
-//    }
 }
