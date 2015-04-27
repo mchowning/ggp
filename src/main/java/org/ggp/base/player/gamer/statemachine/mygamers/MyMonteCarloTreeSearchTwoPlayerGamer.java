@@ -1,40 +1,119 @@
 package org.ggp.base.player.gamer.statemachine.mygamers;
 
-import com.sun.javafx.beans.annotations.NonNull;
+import org.ggp.base.player.gamer.event.GamerSelectedMoveEvent;
+import org.ggp.base.player.gamer.statemachine.sample.SampleGamer;
+import org.ggp.base.util.gdl.grammar.GdlSentence;
 import org.ggp.base.util.statemachine.MachineState;
 import org.ggp.base.util.statemachine.Move;
+import org.ggp.base.util.statemachine.Role;
 import org.ggp.base.util.statemachine.exceptions.GoalDefinitionException;
+import org.ggp.base.util.statemachine.exceptions.MoveDefinitionException;
 import org.ggp.base.util.statemachine.exceptions.TransitionDefinitionException;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 
-public class MyMonteCarloTreeSearchTwoPlayerGamer {
+public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
 
-    private enum NodeType { MAX, MIN }
+    /*
+     * NodeKey
+     */
+
+    private static class NodeKey {
+
+        private MachineState state;
+        private Move gamerMove;
+
+        public static NodeKey forNode(Node node) {
+            return new NodeKey(node.getState(), node.getGamerMove());
+        }
+
+        public static NodeKey forState(MachineState state) {
+            return new NodeKey(state, null);
+        }
+
+        private NodeKey(MachineState state, Move gamerMove) {
+            this.state = state;
+            this.gamerMove = gamerMove;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+
+            NodeKey nodeKey = (NodeKey) o;
+
+            if (state != null ? !state.equals(nodeKey.state) : nodeKey.state != null) return false;
+            return !(gamerMove != null ? !gamerMove.equals(nodeKey.gamerMove) : nodeKey.gamerMove != null);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = state != null ? state.hashCode() : 0;
+            result = 31 * result + (gamerMove != null ? gamerMove.hashCode() : 0);
+            return result;
+        }
+    }
+
+    /*
+     * Node
+     */
 
     private class Node {
 
-        private NodeType nodeType;
+        private static final int UNINITIALIZED_UTILITY = Integer.MIN_VALUE + 1;
+
         private MachineState state;
+        private Move gamerMove;
         private Node parent;
-        private Move moveFromParent;
+        private List<Move> movesFromParent;
+
+        // TESTING
+        private List<Move> availableGamerMoves;
+        private List<Move> availableOpponentMoves;
+
         private List<Node> children = new ArrayList<>();
         private int numVisits = 0;
-        private int utility = 0;
+        private Integer utility = UNINITIALIZED_UTILITY;
 
-        //        public Node(NodeType nodeType, MachineState state, Node parent, Move moveFromParent) {
-        public Node(MachineState state, Node parent, Move moveFromParent) {
-            this.nodeType = nodeType;
+
+        public Node(MachineState state, Move gamerMove, Node parent, List<Move> movesFromParent) throws MoveDefinitionException {
             this.state = state;
+            this.gamerMove = gamerMove;
             this.parent = parent;
-            this.moveFromParent = moveFromParent;
+            this.movesFromParent = movesFromParent;
+            fillAvailableMoves();
+        }
+
+        // TESTING
+        private void fillAvailableMoves() throws MoveDefinitionException {
+            for (Role role : getStateMachine().getRoles()) {
+                List<Move> availableMovesForRole = getStateMachine().getLegalMoves(getState(), role);
+                if (role.equals(getRole())) {
+                    availableGamerMoves = availableMovesForRole;
+                } else {
+                    availableOpponentMoves = availableMovesForRole;
+                }
+            }
         }
 
         public MachineState getState() {
             return state;
+        }
+
+        public boolean isMaxNode() {
+            return gamerMove == null;
+        }
+
+        public boolean isMinNode() {
+            return !isMaxNode();
+        }
+
+        public Move getGamerMove() {
+            return gamerMove;
         }
 
         public Node getParent() {
@@ -45,15 +124,12 @@ public class MyMonteCarloTreeSearchTwoPlayerGamer {
             children.add(childNode);
         }
 
-        public Node createChildNode(MachineState state, Move move) {
-//        public Node createChildNode(NodeType nodeType, MachineState state, Move move) {
-//            Node childNode = new Node(nodeType, state, this, move);
-            Node childNode = new Node(state, this, move);
+        public Node createChildNode(MachineState state, Move gamerMove, List<Move> moveFromParent) throws MoveDefinitionException {
+            Node childNode = new Node(state, gamerMove, this, moveFromParent);
             children.add(childNode);
             return childNode;
         }
 
-        @NonNull
         public List<Node> getChildren() {
             return children;
         }
@@ -66,38 +142,51 @@ public class MyMonteCarloTreeSearchTwoPlayerGamer {
             return numVisits;
         }
 
-        public int getTotalUtility() {
-            return utility;
+        public boolean hasInitializedUtility() {
+            return utility != UNINITIALIZED_UTILITY;
         }
 
-        public int getEffectiveUtility() {
-            if (numVisits == 0) {
-                return Integer.MIN_VALUE;
-            } else {
-                return utility / numVisits;
-            }
+        public int getUtility() {
+            if (!hasInitializedUtility()) throw new RuntimeException("should not be getting uninitialized utility");
+            return utility;
         }
 
         public void setUtility(int utility) {
             this.utility = utility;
         }
 
-        public Move getMoveFromParent() {
-            return moveFromParent;
+        public void updateUtilityIfAppropriate(int possibleNewUtilty) {
+            if (utility == UNINITIALIZED_UTILITY ||
+               ( isMaxNode() && possibleNewUtilty > utility ) ||
+               ( isMinNode() && possibleNewUtilty < utility ) )
+            {
+                utility = possibleNewUtilty;
+            }
+        }
+
+        public void setMovesFromParent(List<Move> moveList) {
+            movesFromParent = moveList;
+        }
+
+        public List<Move> getMovesFromParent() {
+            return movesFromParent;
         }
     }
 
-    //    private static final int DEPTH_LIMIT = 3;
+    /*
+     * Class methods
+     */
+
     private static final int NUM_PROBES = 50;
     private Random random = new Random();
 
-    private Map<MachineState, Node> nodeMap = new HashMap<>();
-
-    @Override
-    public void stateMachineStop() {
-        super.stateMachineStop();
-        nodeMap.clear();
-    }
+//    private Map<NodeKey, Node> nodeMap = new HashMap<>();
+//
+//    @Override
+//    public void stateMachineStop() {
+//        super.stateMachineStop();
+//        nodeMap.clear();
+//    }
 
     @Override
     public Move stateMachineSelectMove(long timeout) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
@@ -115,267 +204,266 @@ public class MyMonteCarloTreeSearchTwoPlayerGamer {
 
     private Move getBestMove() throws TransitionDefinitionException, GoalDefinitionException, MoveDefinitionException {
 
-        Node startNode;
-        if (nodeMap.containsKey(getCurrentState())) {
-            startNode = nodeMap.get(getCurrentState());
-        } else {
-//            startNode = new Node(NodeType.MAX, getCurrentState(), null, null);
-            startNode = new Node(getCurrentState(), null, null);
-        }
+//        NodeKey keyForStateWithNoGamerMove = NodeKey.forState(getCurrentState());
+//        if (!nodeMap.containsKey(keyForStateWithNoGamerMove)) {
+//            Node newNode = new Node(getCurrentState(), null, null, null);
+//            nodeMap.put(keyForStateWithNoGamerMove, newNode);
+//        }
+//        startNode = nodeMap.get(keyForStateWithNoGamerMove);
 
+        Node startNode = new Node(getCurrentState(), null, null, null);
 
-        Node selectedUnexpandedNode = selectNode(startNode);
-        expandNode(selectedUnexpandedNode);
         for (int i = 0; i < NUM_PROBES; i++) {
-            int terminalNodeValue = getValueOfRandomTerminalNode(selectedUnexpandedNode);
-            backpropogate(selectedUnexpandedNode, terminalNodeValue);
+            System.out.println("probe #: " + i);
+            Node selectedNode = selectNode(startNode);
+            expandNode(selectedNode);
+           int randomTerminalValue = getRandomTerminalValue(startNode);
+            backpropogate(selectedNode, randomTerminalValue);
+//            int terminalNodeValue = getRandomTerminalValue(selectedNode);
+//            updateNodeValue(selectedNode, terminalNodeValue);
+//            backpropogate(selectedNode, terminalNodeValue);
         }
 
         Node bestChildNode = null;
         for (Node node : startNode.getChildren()) {
-            if (bestChildNode == null || node.getEffectiveUtility() > bestChildNode.getEffectiveUtility()) {
+            if (bestChildNode == null || (node.hasInitializedUtility() && node.getUtility() > bestChildNode.getUtility())) {
                 bestChildNode = node;
             }
         }
-        System.out.println(bestChildNode.getEffectiveUtility());
-        return bestChildNode.getMoveFromParent();
-
-//
-//        Move bestMove = null;
-//        int bestScore = Integer.MIN_VALUE;
-//        int worstScore = Integer.MAX_VALUE;
-//        for (Move move : moves) {
-//            int moveScore = getMinScore(getCurrentState(), move, 0);
-//            if (moveScore == 100) {
-//                System.out.println("Winning move found");
-//                return move;
-//            } else if (moveScore >= bestScore) {
-//                bestScore = moveScore;
-//                bestMove = move;
-//            }
-//            if (moveScore <= worstScore) {
-//                worstScore = moveScore;
-//            }
-//        }
-//        if (worstScore == bestScore) {
-//            System.out.println("worstScore == bestScore, with score of: " + bestScore);
-//            return getRandomMove(moves);
-//        } else {
-//            System.out.println("bestScore of: " + bestScore);
-//            return bestMove;
-//        }
+        System.out.println("best move score: " + bestChildNode.getUtility());
+        return bestChildNode.getGamerMove();
     }
 
-    // FIXME only works for 1-player game
+//    private void updateNodeValue(Node node, int score) {
+//        int nodePrevValue = node.getUtility();
+//        if (node.isMaxNode() && score > nodePrevValue) {
+//            node.setUtility(score);
+//        } else if (score < nodePrevValue) {
+//            node.setUtility(score);
+//        }
+//    }
+
     private Node selectNode(Node startNode) throws MoveDefinitionException, TransitionDefinitionException {
-        if (startNode.getNumVisits() == 0 || startNode.getChildren().isEmpty()) {
+        if (startNode.getNumVisits() == 0 || getStateMachine().isTerminal(startNode.getState())) {
             return startNode;
         } else {
-            List<Node> children = startNode.getChildren();
-            for (Node childNode: children) {
+            Node childWithHighestSelectValue = null;
+            int bestSelectValue = Integer.MIN_VALUE;
+
+            for (Node childNode : startNode.getChildren()) {
                 if (childNode.getNumVisits() == 0) {
                     return childNode;
                 }
-            }
-
-            // FIXME this needs to alternate based on whether it is a min or max node??
-            int bestSelectValue = Integer.MIN_VALUE;
-            Node resultingNode = null;
-            for (Node childNode : children) {
                 int childSelectValue = selectFn(childNode);
                 if (childSelectValue > bestSelectValue) {
                     bestSelectValue = childSelectValue;
-                    resultingNode = childNode;
+                    childWithHighestSelectValue = childNode;
                 }
             }
-            return selectNode(resultingNode);
+
+            return selectNode(childWithHighestSelectValue);
         }
     }
 
     private int selectFn(Node node) {
         Node parentNode = node.getParent();
-        int nodeTotalUtility = node.getTotalUtility();
+        int nodeUtility = node.getUtility();
         int nodeVisits = node.getNumVisits();
         int parentNodeVisits = parentNode == null ? 0 : parentNode.getNumVisits();
-        return (int) (nodeTotalUtility + Math.sqrt( 2 * Math.log(parentNodeVisits) / nodeVisits));
+
+        if (node.isMinNode()) {
+            nodeUtility = 0 - nodeUtility;
+        }
+
+        return (int) (nodeUtility + Math.sqrt( 2 * Math.log(parentNodeVisits) / nodeVisits));
     }
 
-    // FIXME only works for 1-player game
     private void expandNode(Node node) throws MoveDefinitionException, TransitionDefinitionException {
-        MachineState nodeState = node.getState();
-        List<Move> moveList = getStateMachine().getLegalMoves(nodeState, getRole());
-        for (Move move : moveList) {
-            MachineState childState = getStateMachine().getNextState(nodeState, Collections.singletonList(move));
-            Node newNode = node.createChildNode(childState, move);
-            nodeMap.put(newNode.getState(), newNode);
+
+        if (getStateMachine().isTerminal(node.getState())) throw new RuntimeException("Improperly tried to expand terminal node");
+
+        if (node.getChildren().isEmpty()) {
+
+            if (node.isMaxNode()) {
+                Role gamerRole = getRole();
+                List<Move> gamerMoves = getStateMachine().getLegalMoves(node.getState(), gamerRole);
+                for (Move gamerMove : gamerMoves) {
+//                    Node newNode = node.createChildNode(node.getState(), gamerMove, node.getMovesFromParent());
+                    node.createChildNode(node.getState(), gamerMove, node.getMovesFromParent());
+
+//                    addNodeToMap(newNode);
+                }
+            } else {
+                Role opponentRole = getOpponentRole();
+                Move gamerMove = node.getGamerMove();
+                MachineState nodeState = node.getState();
+                List<Move> opponentMoves = getStateMachine().getLegalMoves(node.getState(), opponentRole);
+                for (Move opponentMove : opponentMoves) {
+                    List<Move> transitionMoveList = getMoveListFor2Players(nodeState, gamerMove, opponentMove);
+                    MachineState childState = getStateMachine().getNextState(nodeState, transitionMoveList);
+//                    Node newNode = node.createChildNode(childState, null, node.getGamerMove());
+                    node.createChildNode(childState, null, transitionMoveList);
+
+//                    addNodeToMap(newNode);
+                }
+            }
         }
     }
 
-    // FIXME only works for 1-player game
+//    private void addNodeToMap(Node newNode) {
+//        NodeKey nodeKey = NodeKey.forNode(newNode);
+//        nodeMap.put(nodeKey, newNode);
+//    }
+
+//    private MachineState getNextMachineState(MachineState state, Move gamerMove, Move opponentMove) throws TransitionDefinitionException {
+//        List<Move> moveList = getMoveListFor2Players(state, gamerMove, opponentMove);
+//        return getStateMachine().getNextState(state, moveList);
+//    }
+
+    private List<Move> getMoveListFor2Players(MachineState state, Move gamerMove, Move opponentMove) {
+        List<Move> result = new ArrayList<>();
+        if (isGamerMove(state)) {
+            result.add(gamerMove);
+            result.add(opponentMove);
+        } else {
+            result.add(opponentMove);
+            result.add(gamerMove);
+        }
+        return result;
+    }
+
+    /* Only works for 2-player game */
+    private boolean isGamerMove(MachineState state) {
+        Set<GdlSentence> contents = state.getContents();
+        for (GdlSentence sent : contents) {
+            String sentType = sent.getBody().get(0).toSentence().getName().toString();
+            if (sentType.equals("control")) {
+                final String gamer = "red";
+                final String opponent = "black";
+                String controllingPlayer = sent.getBody().get(0).toSentence().getBody().get(0).toString();
+                switch (controllingPlayer) {
+                    case gamer:
+                        return true;
+                    case opponent:
+                        return false;
+                    default:
+                        throw new RuntimeException("failed to parse in isGamerMove");
+                }
+            }
+        }
+        throw new RuntimeException("failed to get gamer move");
+    }
+
+    private Role getOpponentRole() {
+        Role gamerRole = getRole();
+        for (Role role : getStateMachine().getRoles()) {
+            if (!role.equals(gamerRole)) return role;
+        }
+        throw new RuntimeException("Opponent role not found");
+    }
+
+    /* Applies score to current node if appropriate and then backpropogates in light of this, possibly update score */
     private void backpropogate(Node node, int score) {
+        if (node == null) throw new RuntimeException("can't backpropogate null node");
         node.addVisit();
-        int prevUtility = node.getTotalUtility();
-        int newUtility = prevUtility + score;
-        node.setUtility(newUtility);
+        node.updateUtilityIfAppropriate(score);
+        // FIXME make this so it only backpropogates if the score is updated
+        backpropogate(node.getParent());
+    }
 
-        Node nodeParent = node.getParent();
-        if (nodeParent != null) {
-            backpropogate(nodeParent, score);
+    private void backpropogate(Node node) {
+
+        if (node == null) return;
+
+        node.addVisit();
+
+        int newUtility;
+        if (node.isMaxNode()) {
+            newUtility = getUtilityOfMaxChild(node);
+        } else {
+            newUtility = getUtilityOfMinChild(node);
+        }
+        node.updateUtilityIfAppropriate(newUtility);
+
+        // FIXME make this so it only backpropogates if the score is updated
+        backpropogate(node.getParent());
+    }
+
+    // TODO try using lambda expressions here?
+    private int getUtilityOfMaxChild(Node node) {
+        int maxUtility = Integer.MIN_VALUE;
+        for (Node childNode : node.getChildren()) {
+            if (childNode.hasInitializedUtility()) {
+                int childUtility = childNode.getUtility();
+                if (childUtility > maxUtility) {
+                    maxUtility = childUtility;
+                }
+            }
+        }
+        return maxUtility;
+    }
+
+    // TODO try using lambda expressions here?
+    private int getUtilityOfMinChild(Node node) {
+        int minUtility = Integer.MAX_VALUE;
+        for (Node childNode : node.getChildren()) {
+            if (childNode.hasInitializedUtility()) {
+                int childUtility = childNode.getUtility();
+                if (childUtility < minUtility) {
+                    minUtility = childUtility;
+                }
+            }
+        }
+        return minUtility;
+    }
+
+    private int getRandomTerminalValue(Node startNode) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
+        return depthCharge(startNode.getState());
+    }
+
+    private int depthCharge(MachineState state) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException {
+        if (getStateMachine().isTerminal(state)) {
+            System.out.println("got terminal score of: " + getGoalScore(state));
+            return getGoalScore(state);
+        } else {
+            List<Move> moveList = new ArrayList<>();
+            List<Role> roles = getStateMachine().getRoles();
+            for (Role role : roles) {
+                List<Move> legalMovesForRole = getStateMachine().getLegalMoves(state, role);
+                Move randomMove = getRandomMove(legalMovesForRole);
+                moveList.add(randomMove);
+            }
+            MachineState nextState = getStateMachine().getNextState(state, moveList);
+            return depthCharge(nextState);
         }
     }
-
-    private int getValueOfRandomTerminalNode(Node startNode) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
-        return depthCharge(startNode);
-    }
-
-
-
-
-
-
-    /*
-     * Previous code
-     */
 
     private Move getRandomMove(List<Move> moves) {
         return moves.get(random.nextInt(moves.size()));
     }
 
-//    private int getMaxScore(MachineState state, int level) throws GoalDefinitionException, TransitionDefinitionException, MoveDefinitionException {
-//        if (getStateMachine().isTerminal(state)) {
-//            return getGoalScore(state);
-//        } else if (hasReachedDepthLimit(level)) {
-//            return monteCarloSearch(state);
+//    private Node depthCharge(Node node) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException {
+//        if (getStateMachine().isTerminal(node.getState())) {
+//            int score = getGoalScore(node.getState());
+//            node.setUtility(score);
+//            return node;
 //        } else {
-//            int maxScore = Integer.MIN_VALUE;
-//            for (Move move : getStateMachine().getLegalMoves(state, getRole())) {
-//                int score = getMinScore(state, move, level);
-//                if (score >= maxScore) {
-//                    maxScore = score;
-//                }
+//
+//            if (node.getChildren().isEmpty()) {
+//                expandNode(node);
 //            }
-//            return maxScore;
-//        }
-//    }
-
-//    /*
-//     * NOTE: Only works for 1-player or 2-player games
-//     */
-//    private int getMinScore(MachineState state, Move maximizedMove, int level) throws GoalDefinitionException, TransitionDefinitionException, MoveDefinitionException {
 //
-//        List<Role> roles = getStateMachine().getRoles();
-//        switch (roles.size()) {
-//            case 1:
-//                // single player game
-//                MachineState nextState = getStateMachine().getNextState(state, Collections.singletonList(maximizedMove));
-//                return getMaxScore(nextState, level+1);
-//            case 2:
-//                // two player game
-//                return getMinScoreFor2PlayerOpponent(state, maximizedMove, level, roles);
-////                return getAverageScoreForRandom2PlayerOpponent(state, maximizedMove, level, roles);
-//
-//            default:
-//                throw new RuntimeException("Game must have 1 or 2 roles, but has " + roles.size());
-//        }
-//    }
-
-//    private int monteCarloSearch(MachineState state) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException {
-//        if (NUM_PROBES == 0) {
-//            return 50;
-//        } else {
-//            int total = 0;
-//            for (int i = 0; i < NUM_PROBES; i++) {
-//                total += depthCharge(state);
-//            }
-//            return total / NUM_PROBES;
-//        }
-//    }
-
-    // FIXME only works for 1-player
-    private int depthCharge(Node node) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException {
-        if (getStateMachine().isTerminal(node.getState())) {
-            int score = getGoalScore(node.getState());
-            backpropogate(node, score);
-            return score;
-        } else {
-
-            if (node.getChildren().isEmpty()) {
-                expandNode(node);
-            }
-
-            Node randomChildNode = getRandomChildNode(node);
-            return depthCharge(randomChildNode);
-
-
-            // 2-player implementation of depth charge
-//            List<Move> moveList = new ArrayList<>();
-//            List<Role> roles = getStateMachine().getRoles();
-//            for (Role role : roles) {
-//                List<Move> legalMovesForRole = getStateMachine().getLegalMoves(state, role);
-//                Move randomMove = getRandomMove(legalMovesForRole);
-//                moveList.add(randomMove);
-//            }
-//            MachineState nextState = getStateMachine().getNextState(state, moveList);
-//            return depthCharge(nextState);
-        }
-    }
-
-    private Node getRandomChildNode(Node node) {
-        List<Node> childNodes = node.getChildren();
-        return childNodes.get(random.nextInt(childNodes.size()));
-    }
-
-//    private int getAverageScoreForRandom2PlayerOpponent(MachineState state, Move maximizedMove, int level, List<Role> roles) throws MoveDefinitionException, TransitionDefinitionException, GoalDefinitionException {
-//        MachineState nextState;
-//        Role opponent = getOpponentIn2PlayerGame(roles);
-//
-//        int sumOfScores = 0;
-//        List<Move> opponentLegalMoves = getStateMachine().getLegalMoves(state, opponent);
-//        for (Move opponentMove : opponentLegalMoves) {
-//            List<Move> moveList = generateMoveListFor2Players(roles, maximizedMove, opponentMove);
-//            nextState = getStateMachine().getNextState(state, moveList);
-//            int score = getMaxScore(nextState, level + 1);
-//            sumOfScores += score;
-//        }
-//        return sumOfScores / opponentLegalMoves.size();
-//    }
-//
-//    private int getMinScoreFor2PlayerOpponent(MachineState state, Move maximizedMove, int level, List<Role> roles) throws MoveDefinitionException, TransitionDefinitionException, GoalDefinitionException {
-//        MachineState nextState;
-//        Role opponent = getOpponentIn2PlayerGame(roles);
-//
-//        int minScore = Integer.MAX_VALUE;
-//        for (Move opponentMove : getStateMachine().getLegalMoves(state, opponent)) {
-//            List<Move> moveList = generateMoveListFor2Players(roles, maximizedMove, opponentMove);
-//            nextState = getStateMachine().getNextState(state, moveList);
-//            int score = getMaxScore(nextState, level + 1);
-//            if (score < minScore) {
-//                minScore = score;
-//            }
-//        }
-//        return minScore;
-//    }
-//
-//    private List<Move> generateMoveListFor2Players(List<Role> roles, Move gamerMove, Move opponentMove) {
-//        Role gamerRole = getRole();
-//        if (roles.get(0).equals(gamerRole)) {
-//            return Arrays.asList(gamerMove, opponentMove);
-//        } else {
-//            return Arrays.asList(opponentMove, gamerMove);
+//            Node randomChildNode = getRandomChildNode(node);
+//            return depthCharge(randomChildNode);
 //        }
 //    }
 //
-//    private Role getOpponentIn2PlayerGame(List<Role> roles) {
-//        assert(roles.size() == 2);
-//        Role gamerRole = getRole();
-//        return roles.get(0).equals(gamerRole) ? roles.get(1) : roles.get(0);
+//    private Node getRandomChildNode(Node node) {
+//        List<Node> childNodes = node.getChildren();
+//        return childNodes.get(random.nextInt(childNodes.size()));
 //    }
 
     private int getGoalScore(MachineState currentState) throws GoalDefinitionException {
         return getStateMachine().getGoal(currentState, getRole());
     }
-
-//    private boolean hasReachedDepthLimit(int level) {
-//        return level >= DEPTH_LIMIT;
-//    }
 }

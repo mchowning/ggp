@@ -1,6 +1,5 @@
 package org.ggp.base.player.gamer.statemachine.mygamers;
 
-import com.sun.javafx.beans.annotations.NonNull;
 import org.ggp.base.player.gamer.event.GamerSelectedMoveEvent;
 import org.ggp.base.player.gamer.statemachine.sample.SampleGamer;
 import org.ggp.base.util.statemachine.MachineState;
@@ -42,7 +41,6 @@ public class MyMonteCarloTreeSearchSinglePlayerGamer extends SampleGamer {
             return childNode;
         }
 
-        @NonNull
         public List<Node> getChildren() {
             return children;
         }
@@ -155,7 +153,7 @@ public class MyMonteCarloTreeSearchSinglePlayerGamer extends SampleGamer {
 
     private int selectFn(Node node) {
         Node parentNode = node.getParent();
-        int nodeTotalUtility = node.getTotalUtility();
+        int nodeTotalUtility = node.getTotalUtility(); // FIXME this should be the average utility
         int nodeVisits = node.getNumVisits();
         int parentNodeVisits = parentNode == null ? 0 : parentNode.getNumVisits();
         return (int) (nodeTotalUtility + Math.sqrt( 2 * Math.log(parentNodeVisits) / nodeVisits));
