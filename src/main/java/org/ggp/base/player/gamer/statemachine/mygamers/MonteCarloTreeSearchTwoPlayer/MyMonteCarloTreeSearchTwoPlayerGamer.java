@@ -72,15 +72,6 @@ public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
         return bestChildNode.getGamerMove();
     }
 
-//    private void updateNodeValue(Node node, int score) {
-//        int nodePrevValue = node.getUtility();
-//        if (node.isGamerMoveNode() && score > nodePrevValue) {
-//            node.setUtility(score);
-//        } else if (score < nodePrevValue) {
-//            node.setUtility(score);
-//        }
-//    }
-
     private Node selectNode(Node startNode) throws MoveDefinitionException, TransitionDefinitionException {
         if (startNode.getNumVisits() == 0 || getStateMachine().isTerminal(startNode.getState())) {
             return startNode;
@@ -126,9 +117,6 @@ public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
         if (node.getChildren().isEmpty()) {
 
             if (node.isGamerMoveNode()) {
-                Role gamerRole = getRole();
-//                List<Move> gamerMoves = getStateMachine().getLegalMoves(node.getState(), gamerRole);
-//                for (Move gamerMove : gamerMoves) {
                 for (Move gamerMove : node.getAvailableGamerMoves()) {
                     Node newNode = node.createChildNode(node.getState(), gamerMove, node.getMovesFromParent());
                     newNode.fillAvailableMoves(getStateMachine(), getRole());
@@ -136,11 +124,8 @@ public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
 //                    addNodeToMap(newNode);
                 }
             } else {
-                Role opponentRole = getOpponentRole();
                 Move gamerMove = node.getGamerMove();
                 MachineState nodeState = node.getState();
-//                List<Move> opponentMoves = getStateMachine().getLegalMoves(node.getState(), opponentRole);
-//                for (Move opponentMove : opponentMoves) {
                 for (Move opponentMove : node.getAvailableOpponentMoves()) {
                     List<Move> transitionMoveList = getMoveListFor2Players(gamerMove, opponentMove);
                     MachineState childState = getStateMachine().getNextState(nodeState, transitionMoveList);
@@ -160,52 +145,13 @@ public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
 
     /* Only works when gamer is first to move */
     private List<Move> getMoveListFor2Players(Move gamerMove, Move opponentMove) {
-        if(gamerMove.equals(opponentMove)) {
+        if (gamerMove.equals(opponentMove)) {
             System.out.println("gamer and opponent move should not be the same");
         }
         List<Move> result = new ArrayList<>();
         result.add(gamerMove);
         result.add(opponentMove);
         return result;
-//        List<Move> result = new ArrayList<>();
-//        if (isGamerMove(state)) {
-//            result.add(gamerMove);
-//            result.add(opponentMove);
-//        } else {
-//            result.add(opponentMove);
-//            result.add(gamerMove);
-//        }
-//        return result;
-    }
-
-//    /* Only works for 2-player game */
-//    private boolean isGamerMove(MachineState state) {
-//        Set<GdlSentence> contents = state.getContents();
-//        for (GdlSentence sent : contents) {
-//            String sentType = sent.getBody().get(0).toSentence().getName().toString();
-//            if (sentType.equals("control")) {
-//                final String gamer = "red";
-//                final String opponent = "black";
-//                String controllingPlayer = sent.getBody().get(0).toSentence().getBody().get(0).toString();
-//                switch (controllingPlayer) {
-//                    case gamer:
-//                        return true;
-//                    case opponent:
-//                        return false;
-//                    default:
-//                        throw new RuntimeException("failed to parse in isGamerMove");
-//                }
-//            }
-//        }
-//        throw new RuntimeException("failed to get gamer move");
-//    }
-
-    private Role getOpponentRole() {
-        Role gamerRole = getRole();
-        for (Role role : getStateMachine().getRoles()) {
-            if (!role.equals(gamerRole)) return role;
-        }
-        throw new RuntimeException("Opponent role not found");
     }
 
     /* Applies score to current node if appropriate and then backpropogates in light of this, possibly update score */
