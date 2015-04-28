@@ -12,20 +12,16 @@ import org.ggp.base.util.statemachine.exceptions.TransitionDefinitionException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.TimeUnit;
 
 public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
 
     private static final int NUM_PROBES = 100;
+    private static final int NUM_SECONDS_SEARCH = 18;
     private Random random = new Random();
     private long startTime;
 
-//    private Map<NodeKey, Node> nodeMap = new HashMap<>();
-//
-//    @Override
-//    public void stateMachineStop() {
-//        super.stateMachineStop();
-//        nodeMap.clear();
-//    }
+    private Node rootNode;
 
     @Override
     public Move stateMachineSelectMove(long timeout) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
@@ -50,27 +46,60 @@ public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
 //        }
 //        startNode = nodeMap.get(keyForStateWithNoGamerMove);
 
-        Node startNode = new Node(getCurrentState(), null, null, null);
-        startNode.fillAvailableMoves(getStateMachine(), getRole());
+//        if (rootNode == null) {
+//            rootNode =  new Node(getCurrentState(), null, null, null);
+//            rootNode.fillAvailableMoves(getStateMachine(), getRole());
+//        } else {
+//            Node newRootNode = null;
+//            for (Node firstChild : rootNode.getChildren()) {
+//                for (Node secondChild : firstChild.getChildren()) {
+//                    if (matchesCurrentState(secondChild.getState())) {
+//                        newRootNode = secondChild;
+//                    }
+//                }
+//            }
+//            if (newRootNode == null) throw new RuntimeException("failed to find new root node");
+//            rootNode = newRootNode;
+//            rootNode.dropParent();
+//        }
 
-        for (int i = 0; i < NUM_PROBES; i++) {
-//        while (TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis() - startTime) < 10) {
+        rootNode =  new Node(getCurrentState(), null, null, null);
+        rootNode.fillAvailableMoves(getStateMachine(), getRole());
+
+//        for (int i = 0; i < NUM_PROBES; i++) {
+        while (TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis() - startTime) < NUM_SECONDS_SEARCH) {
 //            System.out.println("probe #: " + i);
-            Node selectedNode = selectNode(startNode);
+            Node selectedNode = selectNode(rootNode);
             expandNode(selectedNode);
-           int randomTerminalValue = getRandomTerminalValue(startNode);
+            int randomTerminalValue = getRandomTerminalValue(rootNode);
             backpropogate(selectedNode, randomTerminalValue);
         }
 
         Node bestChildNode = null;
-        for (Node node : startNode.getChildren()) {
+        for (Node node : rootNode.getChildren()) {
+            System.out.println(node.getUtility() + " for move: " + node.getGamerMove());
             if (bestChildNode == null || (node.hasInitializedUtility() && node.getUtility() > bestChildNode.getUtility())) {
                 bestChildNode = node;
             }
         }
-        System.out.println("best move score: " + bestChildNode.getUtility());
+        System.out.println("number of visits to rootNode: " + rootNode.getNumVisits());
+        System.out.println("best move score: " + bestChildNode.getUtility() + "\n");
         return bestChildNode.getGamerMove();
     }
+
+//    private boolean matchesCurrentState(MachineState state) {
+//        for (GdlSentence currentSent : getCurrentState().getContents()) {
+//            boolean hasMatch = false;
+//            for (GdlSentence stateSent : state.getContents()) {
+//                if (currentSent.equals(stateSent)) {
+//                    hasMatch = true;
+//                    break;
+//                }
+//            }
+//            if (!hasMatch) return false;
+//        }
+//        return true;
+//    }
 
     private Node selectNode(Node startNode) throws MoveDefinitionException, TransitionDefinitionException {
         if (startNode.getNumVisits() == 0 || getStateMachine().isTerminal(startNode.getState())) {
@@ -110,7 +139,7 @@ public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
     private void expandNode(Node node) throws MoveDefinitionException, TransitionDefinitionException {
 
         if (getStateMachine().isTerminal(node.getState())) {
-            System.out.println("Improperly tried to expand terminal node");
+//            System.out.println("Improperly tried to expand terminal node");
             return;
         }
 
@@ -120,8 +149,6 @@ public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
                 for (Move gamerMove : node.getAvailableGamerMoves()) {
                     Node newNode = node.createChildNode(node.getState(), gamerMove, node.getMovesFromParent());
                     newNode.fillAvailableMoves(getStateMachine(), getRole());
-
-//                    addNodeToMap(newNode);
                 }
             } else {
                 Move gamerMove = node.getGamerMove();
@@ -131,17 +158,12 @@ public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
                     MachineState childState = getStateMachine().getNextState(nodeState, transitionMoveList);
                     Node newNode = node.createChildNode(childState, null, transitionMoveList);
                     newNode.fillAvailableMoves(getStateMachine(), getRole());
-
-//                    addNodeToMap(newNode);
                 }
             }
         }
     }
 
-//    private void addNodeToMap(Node newNode) {
-//        NodeKey nodeKey = NodeKey.forNode(newNode);
-//        nodeMap.put(nodeKey, newNode);
-//    }
+    // TODO combine separate nodes for both moves to a single node where 1 move is predetermined
 
     /* Only works when gamer is first to move */
     private List<Move> getMoveListFor2Players(Move gamerMove, Move opponentMove) {
@@ -156,30 +178,33 @@ public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
 
     /* Applies score to current node if appropriate and then backpropogates in light of this, possibly update score */
     private void backpropogate(Node node, int score) {
-        if (node == null) throw new RuntimeException("can't backpropogate null node");
-        node.addVisit();
-        node.updateUtilityIfAppropriate(score);
-        // TODO make this so it only backpropogates if the score is updated
-        backpropogate(node.getParent());
-    }
-
-    private void backpropogate(Node node) {
-
-        if (node == null) return;
-
-        node.addVisit();
-
-        int newUtility;
-        if (node.isGamerMoveNode()) {
-            newUtility = getUtilityOfMaxChild(node);
-        } else {
-            newUtility = getUtilityOfMinChild(node);
+//        if (node == null) throw new RuntimeException("can't backpropogate null node");
+        if (node != null) {
+            node.addVisit();
+            node.updateUtilityIfAppropriate(score);
+            backpropogate(node.getParent(), score);
         }
-        node.updateUtilityIfAppropriate(newUtility);
-
         // TODO make this so it only backpropogates if the score is updated
-        backpropogate(node.getParent());
+//        backpropogate(node.getParent());
     }
+
+//    private void backpropogate(Node node) {
+//
+//        if (node == null) return;
+//
+//        node.addVisit();
+//
+//        int newUtility;
+////        if (node.isGamerMoveNode()) {
+//            newUtility = getUtilityOfMaxChild(node);
+////        } else {
+////            newUtility = getUtilityOfMinChild(node);
+////        }
+//        node.updateUtilityIfAppropriate(newUtility);
+//
+//        // TODO make this so it only backpropogates if the score is updated
+//        backpropogate(node.getParent());
+//    }
 
     // TODO try using lambda expressions here?
     private int getUtilityOfMaxChild(Node node) {
@@ -215,7 +240,6 @@ public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
 
     private int depthCharge(MachineState state) throws GoalDefinitionException, MoveDefinitionException, TransitionDefinitionException {
         if (getStateMachine().isTerminal(state)) {
-//            System.out.println("got terminal score of: " + getGoalScore(state));
             return getGoalScore(state);
         } else {
             List<Move> moveList = new ArrayList<>();

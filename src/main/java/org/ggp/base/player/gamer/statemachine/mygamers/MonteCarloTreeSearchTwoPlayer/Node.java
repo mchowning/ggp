@@ -80,6 +80,10 @@ class Node {
         return parent;
     }
 
+    public void dropParent() {
+        parent = null;
+    }
+
     public void addChildNode(Node childNode) {
         children.add(childNode);
     }
