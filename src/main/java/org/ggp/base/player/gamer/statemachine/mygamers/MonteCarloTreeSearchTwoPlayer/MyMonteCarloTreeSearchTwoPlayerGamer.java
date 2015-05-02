@@ -17,31 +17,31 @@ import java.util.concurrent.TimeUnit;
 public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
 
     private static final int NUM_PROBES = 100;
-    private static final int NUM_SECONDS_SEARCH = 18;
+    private static final long TIME_CUSHION_MILLIS = TimeUnit.SECONDS.toMillis(2);
     private static final int INDEX_OF_GAMER_ROLE = 0;
 
     private Random random = new Random();
-    private long startTime;
 
     private Node rootNode;
+
+    // TODO make sure this can handle if gamer is the second gamer
 
     @Override
     public Move stateMachineSelectMove(long timeout) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
 
-        // TODO use timeout
+        long startTime = System.currentTimeMillis();
 
-        startTime = System.currentTimeMillis();
-
-        List<Move> moves = getStateMachine().getLegalMoves(getCurrentState(), getRole());
-        Move bestMove = getBestMove();
+        long allowedSolveTimeWithCushion = timeout - TIME_CUSHION_MILLIS;
+        Move bestMove = getBestMove(allowedSolveTimeWithCushion);
 
         long stop = System.currentTimeMillis();
+        List<Move> moves = getStateMachine().getLegalMoves(getCurrentState(), getRole());
         notifyObservers(new GamerSelectedMoveEvent(moves, bestMove, stop - startTime));
 
         return bestMove;
     }
 
-    private Move getBestMove() throws TransitionDefinitionException, GoalDefinitionException, MoveDefinitionException {
+    private Move getBestMove(long allowedSolveTime) throws TransitionDefinitionException, GoalDefinitionException, MoveDefinitionException {
 
 //        NodeKey keyForCurrentStateWithNoMoves = NodeKey.forState(getCurrentState());
 //        if (!nodeMap.containsKey(keyForCurrentStateWithNoMoves)) {
@@ -69,9 +69,11 @@ public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
 
         rootNode =  new Node(getCurrentState(), null, null, getStateMachine(), getRole());
 
-//        for (int i = 0; i < NUM_PROBES; i++) {
-        while (TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis() - startTime) < NUM_SECONDS_SEARCH) {
-//            System.out.println("probe #: " + i);
+//        while (TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis() - startTime) < TIME_CUSHION_MILLIS) {
+        while (System.currentTimeMillis() < allowedSolveTime) {
+
+
+
             Node selectedNode = selectNode(rootNode);
             expandNode(selectedNode);
             GoalState randomTerminalGoalState = getRandomTerminalValue(selectedNode);
