@@ -2,6 +2,7 @@ package org.ggp.base.player.gamer.statemachine.mygamers.MonteCarloTreeSearchTwoP
 
 import org.ggp.base.player.gamer.event.GamerSelectedMoveEvent;
 import org.ggp.base.player.gamer.statemachine.sample.SampleGamer;
+import org.ggp.base.util.gdl.grammar.GdlSentence;
 import org.ggp.base.util.statemachine.MachineState;
 import org.ggp.base.util.statemachine.Move;
 import org.ggp.base.util.statemachine.Role;
@@ -16,7 +17,6 @@ import java.util.concurrent.TimeUnit;
 
 public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
 
-    private static final int NUM_PROBES = 100;
     private static final long TIME_CUSHION_MILLIS = TimeUnit.SECONDS.toMillis(2);
     private static final int INDEX_OF_GAMER_ROLE = 0;
 
@@ -43,37 +43,21 @@ public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
 
     private Move getBestMove(long allowedSolveTime) throws TransitionDefinitionException, GoalDefinitionException, MoveDefinitionException {
 
-//        NodeKey keyForCurrentStateWithNoMoves = NodeKey.forState(getCurrentState());
-//        if (!nodeMap.containsKey(keyForCurrentStateWithNoMoves)) {
-//            Node newNode = new Node(getCurrentState(), null, null, null, getRole());
-//            nodeMap.put(keyForCurrentStateWithNoMoves, newNode);
-//        }
-//        startNode = nodeMap.get(keyForCurrentStateWithNoMoves);
+        if (rootNode == null) {
+            rootNode = new Node(getCurrentState(), null, null, getStateMachine(), getRole());
+        } else {
+            Node newRootNode = null;
+            for (Node child : rootNode.getChildren()) {
+                if (matchesCurrentState(child.getState())) {
+                    newRootNode = child;
+                }
+            }
+            if (newRootNode == null) throw new RuntimeException("failed to find new root node");
+            rootNode = newRootNode;
+            rootNode.dropParent();
+        }
 
-//        if (rootNode == null) {
-//            rootNode =  new Node(getCurrentState(), null, null, null);
-//            rootNode.fillAvailableMoves(getStateMachine(), getRole());
-//        } else {
-//            Node newRootNode = null;
-//            for (Node firstChild : rootNode.getChildren()) {
-//                for (Node secondChild : firstChild.getChildren()) {
-//                    if (matchesCurrentState(secondChild.getState())) {
-//                        newRootNode = secondChild;
-//                    }
-//                }
-//            }
-//            if (newRootNode == null) throw new RuntimeException("failed to find new root node");
-//            rootNode = newRootNode;
-//            rootNode.dropParent();
-//        }
-
-        rootNode =  new Node(getCurrentState(), null, null, getStateMachine(), getRole());
-
-//        while (TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis() - startTime) < TIME_CUSHION_MILLIS) {
         while (System.currentTimeMillis() < allowedSolveTime) {
-
-
-
             Node selectedNode = selectNode(rootNode);
             expandNode(selectedNode);
             GoalState randomTerminalGoalState = getRandomTerminalValue(selectedNode);
@@ -90,6 +74,20 @@ public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
         System.out.println("number of visits to rootNode: " + rootNode.getNumVisits());
         System.out.println("best move gamer score: " + bestChildNode.getGamerUtility() + "\n");
         return bestChildNode.getMovesFromParent().get(INDEX_OF_GAMER_ROLE);
+    }
+
+    private boolean matchesCurrentState(MachineState state) {
+        for (GdlSentence currentSent : getCurrentState().getContents()) {
+            boolean hasMatch = false;
+            for (GdlSentence stateSent : state.getContents()) {
+                if (currentSent.equals(stateSent)) {
+                    hasMatch = true;
+                    break;
+                }
+            }
+            if (!hasMatch) return false;
+        }
+        return true;
     }
 
     private Node selectNode(Node startNode) throws MoveDefinitionException, TransitionDefinitionException {
@@ -156,63 +154,12 @@ public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
 
     /* Applies score to current node if appropriate and then backpropogates in light of this, possibly update score */
     private void backpropogate(Node node, GoalState score) {
-//        if (node == null) throw new RuntimeException("can't backpropogate null node");
         if (node != null) {
             node.addVisit();
-//            node.updateUtilityIfAppropriate(score);
-//            if (node.isGamerNode()) {
-//
-//            } else {
-//
-//            }
             node.updateUtilityWithGoalState(score);
             backpropogate(node.getParent(), score);
         }
-        // TODO make this so it only backpropogates if the score is updated
-//        backpropogate(node.getParent());
     }
-
-//    private void backpropogate(Node node) {
-//
-//        if (node == null) return;
-//
-//        node.addVisit();
-//
-//        int newUtility;
-////        if (node.isGamerMoveNode()) {
-//            newUtility = getUtilityOfMaxChild(node);
-////        } else {
-////            newUtility = getUtilityOfMinChild(node);
-////        }
-//        node.updateUtilityIfAppropriate(newUtility);
-//
-//        // TODO make this so it only backpropogates if the score is updated
-//        backpropogate(node.getParent());
-//    }
-
-//    // TODO try using lambda expressions here?
-//    private double getUtilityOfMaxChild(Node node) {
-//        double maxUtility = Integer.MIN_VALUE;
-//        for (Node childNode : node.getChildren()) {
-//            double childUtility = childNode.getUtility();
-//            if (childUtility > maxUtility) {
-//                maxUtility = childUtility;
-//            }
-//        }
-//        return maxUtility;
-//    }
-//
-//    // TODO try using lambda expressions here?
-//    private double getUtilityOfMinChild(Node node) {
-//        double minUtility = Integer.MAX_VALUE;
-//        for (Node childNode : node.getChildren()) {
-//            double childUtility = childNode.getUtility();
-//            if (childUtility < minUtility) {
-//                minUtility = childUtility;
-//            }
-//        }
-//        return minUtility;
-//    }
 
     private GoalState getRandomTerminalValue(Node startNode) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
         return depthCharge(startNode.getState());
@@ -226,24 +173,7 @@ public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
             List<Role> roles = getStateMachine().getRoles();
             for (Role role : roles) {
                 List<Move> legalMovesForRole = getStateMachine().getLegalMoves(state, role);
-//                Move randomMove = getRandomMove(legalMovesForRole);
-//                transitionMoveList.add(randomMove);
-
-//                Move selectedMove = isGamer(role) ? getAggressiveMove(legalMovesForRole) : getRandomMove(legalMovesForRole);
-                // TODO problem is that no matter what, early jumps seemed to get evened out
-
-//                Move selectedMove = isGamer(role) ? getAggressiveMove(legalMovesForRole) : getPassiveMove(legalMovesForRole);
-                // TODO could try not allowing passive moves, i.e. moves that go backwards (or sideways?) unless they're a jump?
-
-//                Move selectedMove;
-//                if (legalMovesForRole.size() == 1) {
-//                    selectedMove = legalMovesForRole.get(0);
-//                } else {
-//                    selectedMove = getProgressMove(legalMovesForRole, role);
-//                }
-
                 Move selectedMove = getRandomMove(legalMovesForRole);
-
                 transitionMoveList.add(selectedMove);
             }
             MachineState nextState = getStateMachine().getNextState(state, transitionMoveList);
@@ -251,135 +181,8 @@ public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
         }
     }
 
-    private Move getProgressMove(List<Move> moves, Role role) {
-        List<Move> sidewaysMoves = new ArrayList<>();
-        List<Move> forwardOrJumpMove = new ArrayList<>();
-        for (Move move : moves) {
-            if (isJumpMove(move) || isForwardMove(move, role)) {
-                forwardOrJumpMove.add(move);
-            } else if (isSidewaysMove(move)) {
-                sidewaysMoves.add(move);
-            }
-        }
-        if (forwardOrJumpMove.size() > 0) {
-            return getRandomMove(forwardOrJumpMove);
-        } else if (sidewaysMoves.size() > 0) {
-            return getRandomMove(sidewaysMoves);
-        } else {
-            return getRandomMove(moves);
-        }
-    }
-
-    private static final String BOTTOM_ROLE = "red";
-
-    private boolean isForwardMove(Move move, Role role) {
-        int startRow = getMoveStartRow(move);
-        int endRow = getMoveEndRow(move);
-        if (role.toString().equals(BOTTOM_ROLE)) {
-            return startRow > endRow;
-        } else {
-            return startRow < endRow;
-        }
-    }
-
-    private boolean isSidewaysMove(Move move) {
-        return getMoveStartRow(move) == getMoveEndRow(move);
-    }
-
-    private static final String MOVE_JUMP = "jump";
-    private static final String MOVE_REGULAR = "move";
-    private static final String MOVE_NOOP = "noop";
-
-    private boolean isJumpMove(Move move) {
-        return move.toString().contains(MOVE_JUMP);
-    }
-
-    private boolean isNoopMove(Move move) {
-        return move.toString().contains(MOVE_NOOP);
-    }
-
-//    private String getMoveType(Move move) {
-//        return move.getContents().toSentence().getName().toString();
-//    }
-
-    private static final int MOVE_START_ROW_INDEX = 0;
-    private static final int MOVE_START_COLUMN_INDEX = 1;
-    private static final int MOVE_END_ROW_INDEX = 2;
-    private static final int MOVE_END_COLUMN_INDEX = 3;
-
-    private int getMoveStartRow(Move move) {
-        return getMoveCoordinate(move, MOVE_START_ROW_INDEX);
-    }
-
-    private int getMoveStartColumn(Move move) {
-        return getMoveCoordinate(move, MOVE_START_COLUMN_INDEX);
-    }
-
-    private int getMoveEndRow(Move move) {
-        return getMoveCoordinate(move, MOVE_END_ROW_INDEX);
-    }
-
-    private int getMoveEndColumn(Move move) {
-        return getMoveCoordinate(move, MOVE_END_COLUMN_INDEX);
-    }
-
-    /*
-    * index 0 = [start row (top->bottom from 1)]
-    *       1 = [start column (left->right from 1)]
-    *       2 = [end row]
-    *       3 = [end column]
-    */
-    private int getMoveCoordinate(Move move, int coordinateIndex) {
-        try {
-            String coordinateString = move.getContents().toSentence().getBody().get(coordinateIndex).toString();
-            return Integer.parseInt(coordinateString);
-        } catch (Exception e) {
-            // TESTING
-            e.printStackTrace();
-            throw new RuntimeException("problem getting move coordinate");
-        }
-    }
-
-    /*
-     * move/noop/jump
-     * [start row (top->bottom from 1)]
-     * [start column (left->right from 1)]
-     * [end row]
-     * [end column]
-     * move type = move.getContents().toSentence().getName().toString();
-     * indexes for numbers = move.getContents().toSentence().getBody().get([index]).toString()
-     */
-
-    private boolean isGamer(Role role) {
-        return role.equals(getRole());
-    }
-
     private Move getRandomMove(List<Move> moves) {
         return moves.get(random.nextInt(moves.size()));
-    }
-
-    private Move getAggressiveMove(List<Move> moves) {
-        List<Move> aggressiveMoves = new ArrayList<>();
-        for (Move move : moves) {
-            if (isJumpMove(move)) aggressiveMoves.add(move);
-        }
-        if (aggressiveMoves.isEmpty()) {
-            return getRandomMove(moves);
-        } else {
-            return getRandomMove(aggressiveMoves);
-        }
-    }
-
-    private Move getPassiveMove(List<Move> moves) {
-        List<Move> passiveMoves = new ArrayList<>();
-        for (Move move : moves) {
-            if (!isJumpMove(move)) passiveMoves.add(move);
-        }
-        if (passiveMoves.isEmpty()) {
-            return getRandomMove(moves);
-        } else {
-            return getRandomMove(passiveMoves);
-        }
     }
 
     private GoalState getGoalState(MachineState state) throws GoalDefinitionException {
