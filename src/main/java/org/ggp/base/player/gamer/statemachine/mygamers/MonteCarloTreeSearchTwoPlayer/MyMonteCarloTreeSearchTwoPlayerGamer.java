@@ -2,7 +2,6 @@ package org.ggp.base.player.gamer.statemachine.mygamers.MonteCarloTreeSearchTwoP
 
 import org.ggp.base.player.gamer.event.GamerSelectedMoveEvent;
 import org.ggp.base.player.gamer.statemachine.sample.SampleGamer;
-import org.ggp.base.util.gdl.grammar.GdlSentence;
 import org.ggp.base.util.statemachine.MachineState;
 import org.ggp.base.util.statemachine.Move;
 import org.ggp.base.util.statemachine.Role;
@@ -43,12 +42,26 @@ public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
 
     private Move getBestMove(long allowedSolveTime) throws TransitionDefinitionException, GoalDefinitionException, MoveDefinitionException {
 
+        updateRootNode();
+
+        while (System.currentTimeMillis() < allowedSolveTime) {
+            performMonteCarloTreeSearch(rootNode);
+        }
+
+        Node childNodeForBestMove = getChildNodeForBestMove();
+         System.out.println("number of visits to rootNode: " + rootNode.getNumVisits());
+         System.out.println("best move gamer score: " + childNodeForBestMove.getGamerUtility() + "\n");
+        return childNodeForBestMove.getMovesFromParent().get(INDEX_OF_GAMER_ROLE);
+    }
+
+    private void updateRootNode() {
         if (rootNode == null) {
             rootNode = new Node(getCurrentState(), null, null, getStateMachine(), getRole());
         } else {
             Node newRootNode = null;
             for (Node child : rootNode.getChildren()) {
-                if (matchesCurrentState(child.getState())) {
+                boolean childMatchesCurrentState = Helper.statesMatch(getCurrentState(), child.getState());
+                if (childMatchesCurrentState) {
                     newRootNode = child;
                 }
             }
@@ -56,38 +69,24 @@ public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
             rootNode = newRootNode;
             rootNode.dropParent();
         }
+    }
 
-        while (System.currentTimeMillis() < allowedSolveTime) {
-            Node selectedNode = selectNode(rootNode);
-            expandNode(selectedNode);
-            GoalState randomTerminalGoalState = getRandomTerminalValue(selectedNode);
-            backpropogate(selectedNode, randomTerminalGoalState);
-        }
+    private void performMonteCarloTreeSearch(Node node) throws MoveDefinitionException, TransitionDefinitionException, GoalDefinitionException {
+        Node selectedNode = selectNode(node);
+        expandNode(selectedNode);
+        GoalState randomTerminalGoalState = getRandomTerminalValue(selectedNode);
+        backpropogate(selectedNode, randomTerminalGoalState);
+    }
 
+    private Node getChildNodeForBestMove() {
         Node bestChildNode = null;
         for (Node node : rootNode.getChildren()) {
-            System.out.println("gamer: " + node.getGamerUtility() + ", opp: " + node.getOpponentUtility() + " for move: " + node.getMovesFromParent() + ", with " + node.getNumVisits() + " visits");
+             System.out.println("gamer: " + node.getGamerUtility() + ", opp: " + node.getOpponentUtility() + " for move: " + node.getMovesFromParent() + ", with " + node.getNumVisits() + " visits");
             if (bestChildNode == null || node.getGamerUtility() > bestChildNode.getGamerUtility()) {
                 bestChildNode = node;
             }
         }
-        System.out.println("number of visits to rootNode: " + rootNode.getNumVisits());
-        System.out.println("best move gamer score: " + bestChildNode.getGamerUtility() + "\n");
-        return bestChildNode.getMovesFromParent().get(INDEX_OF_GAMER_ROLE);
-    }
-
-    private boolean matchesCurrentState(MachineState state) {
-        for (GdlSentence currentSent : getCurrentState().getContents()) {
-            boolean hasMatch = false;
-            for (GdlSentence stateSent : state.getContents()) {
-                if (currentSent.equals(stateSent)) {
-                    hasMatch = true;
-                    break;
-                }
-            }
-            if (!hasMatch) return false;
-        }
-        return true;
+        return bestChildNode;
     }
 
     private Node selectNode(Node startNode) throws MoveDefinitionException, TransitionDefinitionException {
@@ -139,8 +138,6 @@ public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
         }
     }
 
-    // TODO combine separate nodes for both moves to a single node where 1 move is predetermined
-
     /* Only works when gamer is first to move */
     private List<Move> getMoveListFor2Players(Move gamerMove, Move opponentMove) {
         if (gamerMove.equals(opponentMove)) {
@@ -152,7 +149,6 @@ public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
         return result;
     }
 
-    /* Applies score to current node if appropriate and then backpropogates in light of this, possibly update score */
     private void backpropogate(Node node, GoalState score) {
         if (node != null) {
             node.addVisit();
@@ -195,6 +191,7 @@ public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
         return getStateMachine().getGoal(currentState, getRole());
     }
 
+    /* Only works when 2-players */
     private int getOpponentGoalScore(MachineState state) throws GoalDefinitionException {
         List<Role> roles = getStateMachine().getRoles();
         Role opponent;
