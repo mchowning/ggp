@@ -12,9 +12,6 @@ import java.util.List;
 
 class Node {
 
-//    private static final int UNINITIALIZED_UTILITY = Integer.MIN_VALUE + 1;
-    private final static String NOOP_MOVE_STRING = "noop";
-
     private MachineState state;
     private Node parent;
     private List<Move> movesFromParent;
@@ -28,8 +25,6 @@ class Node {
     private int numVisits = 0;
     private int gamerTotalUtility = 0;
     private int opponentTotalUtility = 0;
-//    private Integer utility = 0;
-//    private Integer utility = UNINITIALIZED_UTILITY;
 
     public Node(MachineState state, Node parent, List<Move> movesFromParent, StateMachine stateMachine, Role gamerRole) {
         if (stateMachine == null || gamerRole == null) throw new InvalidStateException("Node must have stateMachine and gamerRole defined");
@@ -115,23 +110,6 @@ class Node {
         return numVisits;
     }
 
-//    public boolean hasInitializedUtility() {
-//        return utility != UNINITIALIZED_UTILITY;
-//    }
-
-//    public double getUtility() {
-////        if (!hasInitializedUtility()) {
-////            throw new RuntimeException("should not be getting uninitialized utility");
-////        }
-////            return utility;
-//
-//        if (numVisits == 0) {
-//            return 0;
-//        } else {
-//            return utility / numVisits;
-//        }
-//    }
-
     public double getGamerUtility() {
         return getAverageUtility(gamerTotalUtility);
     }
@@ -142,13 +120,9 @@ class Node {
 
     private double getAverageUtility(int totalUtility) {
         if (numVisits == 0) return 0;
-        return totalUtility / numVisits;
+        return totalUtility / (double) numVisits;
 
     }
-
-//    public int getUtilityForNodeRole() {
-//        return isGamerNode() ? gamerTotalUtility : opponentTotalUtility;
-//    }
 
     public double getUtilityForRole(boolean isGamerUtility) {
         return isGamerUtility ? getGamerUtility() : getOpponentUtility();
