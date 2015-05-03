@@ -23,7 +23,7 @@ public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
     private int estimatedMaxValue = 1;
     private Node rootNode;
 
-    // TODO make sure this can handle if gamer is the second gamer
+    // TODO handle games with more than 2 players and 1 player
 
     @Override
     public Move stateMachineSelectMove(long timeout) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
@@ -64,8 +64,8 @@ public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
         }
 
         Node childNodeForBestMove = getChildNodeForBestMove();
-        System.out.println("number of visits to rootNode: " + rootNode.getNumVisits());
-        System.out.println("best move gamer score: " + childNodeForBestMove.getGamerUtility() + "\n");
+        // System.out.println("number of visits to rootNode: " + rootNode.getNumVisits());
+        // System.out.println("best move gamer score: " + childNodeForBestMove.getGamerUtility() + "\n");
         return childNodeForBestMove.getMovesFromParent().get(indexOfGamerRole);
     }
 
@@ -96,7 +96,7 @@ public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
     private Node getChildNodeForBestMove() {
         Node bestChildNode = null;
         for (Node node : rootNode.getChildren()) {
-             System.out.println("gamer: " + node.getGamerUtility() + ", opp: " + node.getOpponentUtility() + " for move: " + node.getMovesFromParent() + ", with " + node.getNumVisits() + " visits");
+            // System.out.println("gamer: " + node.getGamerUtility() + ", opp: " + node.getOpponentUtility() + " for move: " + node.getMovesFromParent() + ", with " + node.getNumVisits() + " visits");
             if (bestChildNode == null || node.getGamerUtility() > bestChildNode.getGamerUtility()) {
                 bestChildNode = node;
             }
