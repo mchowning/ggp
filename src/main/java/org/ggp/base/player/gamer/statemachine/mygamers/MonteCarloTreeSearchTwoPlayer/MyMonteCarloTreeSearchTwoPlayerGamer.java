@@ -20,7 +20,7 @@ public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
     private static final int INDEX_OF_GAMER_ROLE = 0;
 
     private Random random = new Random();
-
+    private int estimatedMaxValue = 1;
     private Node rootNode;
 
     // TODO make sure this can handle if gamer is the second gamer
@@ -118,9 +118,10 @@ public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
         int parentNodeVisits = parentNode == null ? 0 : parentNode.getNumVisits();
 
         double nodeUtility = node.getUtilityForRole(parentNode.isGamerNode()); // because each node type is being picked by the opposite node type
-        final int gameAppropriateConstant = 50; // TODO handle this constant better for different max game values
-        final double explorationUtility = gameAppropriateConstant * Math.sqrt(Math.log(parentNodeVisits) / nodeVisits);
-        return nodeUtility + explorationUtility;
+        double winRate = nodeUtility / estimatedMaxValue;
+        final int arbitraryConstant = 5;
+        final double explorationUtility = arbitraryConstant * Math.sqrt(Math.log(parentNodeVisits) / nodeVisits);
+        return winRate + explorationUtility;
     }
 
     private void expandNode(Node node) throws MoveDefinitionException, TransitionDefinitionException {
@@ -184,7 +185,15 @@ public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
     private GoalState getGoalState(MachineState state) throws GoalDefinitionException {
         int gamerValue = getGamerGoalScore(state);
         int opponentValue = getOpponentGoalScore(state);
+        updateMaxValue(gamerValue);
+        updateMaxValue(opponentValue);
         return new GoalState(gamerValue, opponentValue);
+    }
+
+    private void updateMaxValue(int newValue) {
+        if (newValue > estimatedMaxValue) {
+            estimatedMaxValue = newValue;
+        }
     }
 
     private int getGamerGoalScore(MachineState currentState) throws GoalDefinitionException {
