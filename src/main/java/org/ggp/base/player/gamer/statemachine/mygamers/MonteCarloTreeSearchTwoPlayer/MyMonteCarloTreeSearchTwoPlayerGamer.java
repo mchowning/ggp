@@ -17,8 +17,8 @@ import java.util.concurrent.TimeUnit;
 public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
 
     private static final long TIME_CUSHION_MILLIS = TimeUnit.SECONDS.toMillis(2);
-    private static final int INDEX_OF_GAMER_ROLE = 0;
 
+    private int indexOfGamerRole;
     private Random random = new Random();
     private int estimatedMaxValue = 1;
     private Node rootNode;
@@ -30,6 +30,8 @@ public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
 
         long startTime = System.currentTimeMillis();
 
+        initializeGamerRoleIndex();
+
         long allowedSolveTimeWithCushion = timeout - TIME_CUSHION_MILLIS;
         Move bestMove = getBestMove(allowedSolveTimeWithCushion);
 
@@ -38,6 +40,19 @@ public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
         notifyObservers(new GamerSelectedMoveEvent(moves, bestMove, stop - startTime));
 
         return bestMove;
+    }
+
+    private void initializeGamerRoleIndex() {
+        Role gamerRole = getRole();
+        List<Role> allRoles = getStateMachine().getRoles();
+        for (int i = 0; i < allRoles.size(); i++) {
+            Role role = allRoles.get(i);
+            if (gamerRole.equals(role)) {
+                indexOfGamerRole = i;
+                return;
+            }
+        }
+        throw new RuntimeException("failed to initialize gamer role index");
     }
 
     private Move getBestMove(long allowedSolveTime) throws TransitionDefinitionException, GoalDefinitionException, MoveDefinitionException {
@@ -49,9 +64,9 @@ public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
         }
 
         Node childNodeForBestMove = getChildNodeForBestMove();
-         System.out.println("number of visits to rootNode: " + rootNode.getNumVisits());
-         System.out.println("best move gamer score: " + childNodeForBestMove.getGamerUtility() + "\n");
-        return childNodeForBestMove.getMovesFromParent().get(INDEX_OF_GAMER_ROLE);
+        System.out.println("number of visits to rootNode: " + rootNode.getNumVisits());
+        System.out.println("best move gamer score: " + childNodeForBestMove.getGamerUtility() + "\n");
+        return childNodeForBestMove.getMovesFromParent().get(indexOfGamerRole);
     }
 
     private void updateRootNode() {
@@ -119,7 +134,7 @@ public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
 
         double nodeUtility = node.getUtilityForRole(parentNode.isGamerNode()); // because each node type is being picked by the opposite node type
         double winRate = nodeUtility / estimatedMaxValue;
-        final int arbitraryConstant = 5;
+        final int arbitraryConstant = 1;
         final double explorationUtility = arbitraryConstant * Math.sqrt(Math.log(parentNodeVisits) / nodeVisits);
         return winRate + explorationUtility;
     }
@@ -139,15 +154,24 @@ public class MyMonteCarloTreeSearchTwoPlayerGamer extends SampleGamer {
         }
     }
 
-    /* Only works when gamer is first to move */
     private List<Move> getMoveListFor2Players(Move gamerMove, Move opponentMove) {
         if (gamerMove.equals(opponentMove)) {
             System.out.println("gamer and opponent move should not be the same");
         }
         List<Move> result = new ArrayList<>();
-        result.add(gamerMove);
-        result.add(opponentMove);
+
+        if (isGamerFirstRole()) {
+            result.add(gamerMove);
+            result.add(opponentMove);
+        } else {
+            result.add(opponentMove);
+            result.add(gamerMove);
+        }
         return result;
+    }
+
+    private boolean isGamerFirstRole() {
+        return getRole().equals(getStateMachine().getRoles().get(0));
     }
 
     private void backpropogate(Node node, GoalState score) {
